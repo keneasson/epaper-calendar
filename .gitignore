@@ -1,0 +1,63 @@
+# Secrets and configuration
+**/config.h
+.env
+.env.*
+
+# Simulation output
+**/display_output.bmp
+**/display_text.log
+
+# PlatformIO build artifacts
+**/.pio/
+**/.pioenvs/
+**/.piolibdeps/
+
+# VSCode/PlatformIO IDE settings
+.vscode/
+
+# Compiled files
+*.o
+*.obj
+*.elf
+*.bin
+*.hex
+*.map
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+
+# IDE specific
+*.swp
+*.swo
+*~
+*.sublime-workspace
+.idea/
+
+# Logs
+*.log
+
+# Test coverage
+coverage/
+.coverage
+
+# Backup files
+*.bak
+*.orig
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# Node modules (if any web components)
+node_modules/
+
+# Python
+__pycache__/
+*.pyc
+.venv/

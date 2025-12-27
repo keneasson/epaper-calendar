@@ -1,0 +1,12 @@
+# Wokwi Simulation Configuration
+# https://docs.wokwi.com/vscode/project-config
+
+[wokwi]
+version = 1
+firmware = ".pio/build/wokwi/firmware.bin"
+elf = ".pio/build/wokwi/firmware.elf"
+
+# GDB debugging support
+[wokwi.gdb]
+enabled = true
+break_on_entry = false

@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "author": "Church Schedule Display",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "board-esp32-devkit-c-v4",
+      "id": "esp",
+      "top": 0,
+      "left": 0,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-ili9341",
+      "id": "lcd",
+      "top": -200,
+      "left": 200,
+      "attrs": { "flipHorizontal": "1" }
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "bat_sim",
+      "top": 150,
+      "left": -100,
+      "attrs": { "value": "3700" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "status_led",
+      "top": 50,
+      "left": -80,
+      "attrs": { "color": "green" }
+    }
+  ],
+  "connections": [
+    ["esp:TX0", "$serialMonitor:RX", "", []],
+    ["esp:RX0", "$serialMonitor:TX", "", []],
+    ["esp:GND.1", "lcd:GND", "black", ["v:20", "h:100"]],
+    ["esp:3V3", "lcd:VCC", "red", ["v:10", "h:110"]],
+    ["esp:D23", "lcd:MOSI", "green", ["v:30", "h:120"]],
+    ["esp:D18", "lcd:SCK", "yellow", ["v:40", "h:130"]],
+    ["esp:D5", "lcd:CS", "orange", ["v:50", "h:140"]],
+    ["esp:D17", "lcd:DC", "purple", ["v:60", "h:150"]],
+    ["esp:D16", "lcd:RST", "blue", ["v:70", "h:160"]],
+    ["bat_sim:SIG", "esp:D36", "brown", ["v:0"]],
+    ["bat_sim:GND", "esp:GND.2", "black", ["v:10"]],
+    ["bat_sim:VCC", "esp:3V3", "red", ["v:20"]],
+    ["status_led:A", "esp:D2", "green", ["h:0"]],
+    ["status_led:C", "esp:GND.1", "black", ["h:10"]]
+  ]
+}
