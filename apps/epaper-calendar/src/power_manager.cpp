@@ -8,8 +8,10 @@
 #else
 #include <Arduino.h>
 #include <esp_sleep.h>
-#include <driver/rtc_io.h>
 #include <time.h>
+#ifndef ESP32_C6_BUILD
+#include <driver/rtc_io.h>  // Only needed for ESP32-E (EXT0 wakeup)
+#endif
 #endif
 
 #if DEBUG_MODE
@@ -40,10 +42,19 @@ void power_init_button() {
 bool power_was_button_wake() {
 #ifndef NATIVE_BUILD
     esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-    if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
-        LOG("Power: Woken by button press");
+#ifdef ESP32_C6_BUILD
+    // ESP32-C6 uses GPIO wakeup
+    if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO) {
+        LOG("Power: Woken by button press (GPIO)");
         return true;
     }
+#else
+    // ESP32-E uses EXT0 wakeup
+    if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
+        LOG("Power: Woken by button press (EXT0)");
+        return true;
+    }
+#endif
     return false;
 #else
     return false;  // Simulation always returns false
@@ -165,10 +176,16 @@ void power_enter_sleep(long seconds) {
     uint64_t sleepMicros = static_cast<uint64_t>(seconds) * 1000000ULL;
     esp_sleep_enable_timer_wakeup(sleepMicros);
 
-    // Enable button wake-up (EXT0 on GPIO, wake on LOW)
+#ifdef ESP32_C6_BUILD
+    // ESP32-C6: Use GPIO deep sleep wakeup
+    esp_deep_sleep_enable_gpio_wakeup(1ULL << BUTTON_PIN, ESP_GPIO_WAKEUP_GPIO_LOW);
+    LOG("Power: Timer and GPIO wake-up enabled (C6)");
+#else
+    // ESP32-E: Use EXT0 wake-up (RTC GPIO, wake on LOW)
     esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(BUTTON_PIN), 0);
+    LOG("Power: Timer and EXT0 wake-up enabled");
+#endif
 
-    LOG("Power: Timer and button wake-up enabled");
     esp_deep_sleep_start();
 #else
     LOGF("Sleeping for %ld seconds\n", seconds);
@@ -185,9 +202,15 @@ void power_enter_hibernate() {
 #endif
 
 #ifndef NATIVE_BUILD
-    // Enable button wake-up only (no timer)
+#ifdef ESP32_C6_BUILD
+    // ESP32-C6: Use GPIO deep sleep wakeup only (no timer)
+    esp_deep_sleep_enable_gpio_wakeup(1ULL << BUTTON_PIN, ESP_GPIO_WAKEUP_GPIO_LOW);
+    LOG("Power: GPIO wake-up enabled (C6)");
+#else
+    // ESP32-E: Use EXT0 wake-up only (no timer)
     esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(BUTTON_PIN), 0);
-    LOG("Power: Button wake-up enabled");
+    LOG("Power: EXT0 wake-up enabled");
+#endif
     esp_deep_sleep_start();
 #else
     LOG("Power: Hibernate (simulation - exiting)");

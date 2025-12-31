@@ -5,7 +5,10 @@
 #include "Arduino.h"
 #include "HTTPClient.h"
 #else
+#include <Arduino.h>
 #include <HTTPClient.h>
+#include <WiFiClient.h>
+#include <NetworkClientSecure.h>
 #endif
 
 #include <ArduinoJson.h>
@@ -65,20 +68,61 @@ static ResultCode parse_json(const char* json, Schedule& schedule) {
     return ResultCode::Success;
 }
 
+#if defined(NATIVE_BUILD)
+// Native build simulation
 static ResultCode fetch_once(Schedule& schedule) {
     HTTPClient http;
-
     LOGF("API: Fetching from %s\n", API_ENDPOINT);
-
     http.begin(API_ENDPOINT);
     http.setTimeout(API_TIMEOUT_MS);
+    if (strlen(API_KEY) > 0) {
+        http.addHeader("Authorization", String("Bearer ") + API_KEY);
+    }
+    int httpCode = http.GET();
+    if (httpCode != HTTP_CODE_OK) {
+        LOGF("API: HTTP error %d\n", httpCode);
+        http.end();
+        return ResultCode::ApiRequestFailed;
+    }
+    String response = http.getString();
+    http.end();
+    LOGF("API: Response size: %d bytes\n", response.length());
+    if (response.length() == 0) {
+        LOG("API: Empty response");
+        return ResultCode::InvalidResponse;
+    }
+    return parse_json(response.c_str(), schedule);
+}
 
-    // Add authorization header if API key is configured
+#else
+// ESP32 - use Arduino HTTPClient with NetworkClientSecure for HTTPS
+static ResultCode fetch_once(Schedule& schedule) {
+    HTTPClient http;
+    LOGF("API: Fetching from %s\n", API_ENDPOINT);
+
+    NetworkClientSecure client;
+    client.setInsecure();  // Skip certificate validation for now
+
+    LOG("API: Connecting...");
+    if (!http.begin(client, API_ENDPOINT)) {
+        LOG("API: Failed to begin HTTP connection");
+        return ResultCode::ApiRequestFailed;
+    }
+
+    http.setTimeout(API_TIMEOUT_MS);
     if (strlen(API_KEY) > 0) {
         http.addHeader("Authorization", String("Bearer ") + API_KEY);
     }
 
+    LOG("API: Sending GET request...");
     int httpCode = http.GET();
+    LOGF("API: Response code: %d\n", httpCode);
+
+    if (httpCode <= 0) {
+        LOGF("API: Connection failed, error: %s\n", http.errorToString(httpCode).c_str());
+        http.end();
+        return ResultCode::ApiRequestFailed;
+    }
 
     if (httpCode != HTTP_CODE_OK) {
         LOGF("API: HTTP error %d\n", httpCode);
@@ -88,7 +132,6 @@ static ResultCode fetch_once(Schedule& schedule) {
 
     String response = http.getString();
     http.end();
-
     LOGF("API: Response size: %d bytes\n", response.length());
 
     if (response.length() == 0) {
@@ -98,6 +141,7 @@ static ResultCode fetch_once(Schedule& schedule) {
 
     return parse_json(response.c_str(), schedule);
 }
+#endif
 
 ResultCode api_fetch_schedule(Schedule& schedule) {
     LOG("API: Starting fetch");

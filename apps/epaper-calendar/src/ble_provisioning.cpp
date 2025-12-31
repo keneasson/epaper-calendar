@@ -1,6 +1,6 @@
 #include "ble_provisioning.h"
 
-#ifndef NATIVE_BUILD
+#if !defined(NATIVE_BUILD) && !defined(DISABLE_BLE_PROVISIONING)
 
 #include <BLEDevice.h>
 #include <BLEServer.h>
@@ -283,7 +283,7 @@ const char* ble_get_received_password() {
 }
 
 #else
-// Native build stubs
+// Stub implementations for native build or when BLE is disabled
 
 void ble_init(const char* deviceName) { (void)deviceName; }
 void ble_start_advertising() {}
@@ -301,4 +301,4 @@ void ble_set_command_callback(BleCommandCallback callback) { (void)callback; }
 const char* ble_get_received_ssid() { return ""; }
 const char* ble_get_received_password() { return ""; }
 
-#endif // NATIVE_BUILD
+#endif // !NATIVE_BUILD && !DISABLE_BLE_PROVISIONING

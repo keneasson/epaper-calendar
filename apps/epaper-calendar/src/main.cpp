@@ -39,7 +39,24 @@ static BatteryStatus battery;
 
 static void handle_error(const char* message, ResultCode code) {
     LOGF("Error: %s (code %d)\n", message, static_cast<int>(code));
-    display_error(message);
+
+    // Build detailed error message
+    char detail[100];
+    const char* reason = "";
+    switch(code) {
+        case ResultCode::WifiConnectionFailed: reason = "Check SSID/password"; break;
+        case ResultCode::WifiTimeout: reason = "Network not found"; break;
+        case ResultCode::ApiRequestFailed: reason = "HTTP request failed"; break;
+        case ResultCode::ApiTimeout: reason = "API timed out"; break;
+        case ResultCode::JsonParseError: reason = "Invalid API response"; break;
+        case ResultCode::InvalidResponse: reason = "Empty/bad response"; break;
+        case ResultCode::NtpSyncFailed: reason = "Time sync failed"; break;
+        case ResultCode::BatteryCritical: reason = "Battery too low"; break;
+        default: reason = "Unknown error"; break;
+    }
+    snprintf(detail, sizeof(detail), "%s - %s", message, reason);
+
+    display_error(detail);
     power_enter_sleep(SLEEP_ON_ERROR);
 }
 
@@ -52,35 +69,48 @@ void setup() {
     LOG("========================================\n");
 #endif
 
-    // 0. Initialize button and check wake reason
+    // 0. Initialize display FIRST so we can show status
+    display_init();
+
+    // Brief startup delay for firmware updates (reduced from 10s)
+#ifdef ESP32_C6_BUILD
+    LOG("Startup delay: 2 seconds for firmware update window...");
+    delay(2000);
+#endif
+
+    // 1. Initialize button and check wake reason
     power_init_button();
     if (power_was_button_wake()) {
         LOG("Manual refresh triggered by button");
     }
 
-    // 1. Initialize battery monitoring and check level
+    // 2. Initialize battery monitoring and check level
+    LOG("Checking battery...");
     battery_init();
     battery = battery_read();
-
     LOGF("Battery: %.2fV (%d%%)\n", battery.voltage, battery.percentage);
 
     if (battery.isCritical) {
         LOG("Battery critically low - entering hibernate");
+#ifndef ESP32_C6_BUILD
+        // Skip hibernate on C6 during testing (USB power shows as 0V)
         power_enter_hibernate();
         // Never returns
+#else
+        LOG("C6 DEBUG: Skipping hibernate for USB-only testing");
+#endif
     }
-
-    // 2. Initialize display
-    display_init();
 
     // 3. Connect to WiFi
     LOG("Connecting to WiFi...");
+    LOGF("SSID: %s\n", WIFI_SSID);
     ResultCode result = wifi_connect();
 
     if (result != ResultCode::Success) {
-        handle_error("WiFi Connection Failed", result);
+        handle_error("WiFi Failed", result);
         // Never returns
     }
+    LOG("WiFi connected!");
 
     // 4. Sync time via NTP
     LOG("Synchronizing time...");
@@ -93,18 +123,20 @@ void setup() {
 
     // 5. Fetch schedule from API
     LOG("Fetching schedule...");
+    LOGF("API: %s\n", API_ENDPOINT);
     result = api_fetch_schedule(schedule);
 
     if (result != ResultCode::Success) {
         wifi_disconnect();
-        handle_error("API Fetch Failed", result);
+        handle_error("API Failed", result);
         // Never returns
     }
+    LOG("Schedule fetched!");
 
     // 6. Disconnect WiFi (save power)
     wifi_disconnect();
 
-    // 7. Update display
+    // 7. Update display (only display update - no intermediate status screens)
     LOG("Updating display...");
     display_schedule(schedule, battery);
 

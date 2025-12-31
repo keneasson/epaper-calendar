@@ -70,6 +70,33 @@
 // HARDWARE PINS
 // ============================================================================
 
+#ifdef ESP32_C6_BUILD
+// ---- ESP32-C6 + DESPI-C02 + GDEY075Z08 (3-color) ----
+
+// E-Paper display pins
+#define EPD_CS              1
+#define EPD_DC              2
+#define EPD_RST             3
+#define EPD_BUSY            4
+
+// SPI (ESP32-C6)
+#define SPI_MOSI            22  // SDI on DESPI-C02
+#define SPI_CLK             23  // SCK on DESPI-C02
+
+// Battery ADC (FireBeetle 2 ESP32-C6)
+#define BATTERY_PIN         0   // ADC1_CH0 on C6
+#define VOLTAGE_DIVIDER     2.0
+
+// Refresh button (GPIO for wake-from-sleep)
+#define BUTTON_PIN          9   // Boot button on C6
+#define BUTTON_DEBOUNCE_MS  50
+
+// Display type flag
+#define DISPLAY_3COLOR      1
+
+#else
+// ---- ESP32-E + DESPI-C02 + Waveshare 7.5" B/W ----
+
 // E-Paper display (Waveshare 7.5" via DESPI-C02)
 #define EPD_CS              5
 #define EPD_DC              17
@@ -87,6 +114,11 @@
 // Refresh button (RTC GPIO for wake-from-sleep)
 #define BUTTON_PIN          27
 #define BUTTON_DEBOUNCE_MS  50
+
+// Display type flag
+#define DISPLAY_3COLOR      0
+
+#endif
 
 // ============================================================================
 // BATTERY THRESHOLDS

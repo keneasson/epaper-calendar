@@ -1,27 +1,38 @@
-# Assembly Guide: Waveshare 7.5" E-Paper HAT + DFRobot FireBeetle 2 ESP32-C6
+# Assembly Guide: GooDisplay 7.5" E-Paper + DESPI-C02 + FireBeetle 2 ESP32-C6
 
 ## Your Components
 
 | Component | Description |
 |-----------|-------------|
-| Waveshare 7.5" E-Paper HAT | 800x480 e-paper display with driver board (40-pin Raspberry Pi header) |
+| GooDisplay 7.5" E-Paper Display | 800x480 e-paper panel with 24-pin FPC ribbon cable |
+| GooDisplay DESPI-C02 Adapter | Universal e-paper adapter board with 8-pin header |
 | DFRobot FireBeetle 2 ESP32-C6 | Low-power IoT board (160MHz RISC-V, WiFi 6, BLE 5, 16uA deep sleep) |
-
-## Important: Direct Plug-in is NOT Possible
-
-The HAT has a **40-pin Raspberry Pi header** - it will NOT plug directly into the FireBeetle. You need **jumper wires** to connect them.
+| LiPo Battery | 3.7V lithium polymer battery (optional for portable use) |
 
 ## What You Need
 
 **Required:**
-- 8-9x Female-to-Female jumper wires (Dupont cables)
-- Soldering iron + solder (to solder headers onto both boards)
+- 8x Female-to-Female jumper wires (Dupont cables)
+- Soldering iron + solder (to solder headers onto FireBeetle)
 
 **Header pins to solder:**
-- FireBeetle: Solder the male header pins pointing DOWN
-- E-Paper HAT: The 40-pin header should already be present; if not, solder it
+- FireBeetle: Solder the male header pins pointing DOWN (away from components)
+- DESPI-C02: Has 8-pin header already installed
 
 ## Pin Mapping
+
+### DESPI-C02 Pin Functions
+
+| Pin | Function |
+|-----|----------|
+| BUSY | Busy status output pin |
+| RES | External reset pin (low = reset) |
+| D/C | Data/Command control (high = data, low = command) |
+| CS | SPI chip select (active low) |
+| SCK | SPI clock signal |
+| SDI | SPI data input (MOSI) |
+| GND | Ground |
+| 3.3V | Power supply |
 
 ### FireBeetle 2 ESP32-C6 SPI Pins
 
@@ -32,92 +43,62 @@ The HAT has a **40-pin Raspberry Pi header** - it will NOT plug directly into th
 | MISO (Data In) | GPIO 21 |
 | Default CS | GPIO 1 |
 
-### Wiring: E-Paper HAT to FireBeetle ESP32-C6
+### Wiring: DESPI-C02 to FireBeetle ESP32-C6
 
-| E-Paper HAT Pin | Wire to | ESP32-C6 Pin | Notes |
-|-----------------|---------|--------------|-------|
-| VCC | --> | 3V3 | 3.3V power |
+| DESPI-C02 Pin | Wire to | ESP32-C6 Pin | Notes |
+|---------------|---------|--------------|-------|
+| 3.3V | --> | 3V3 | Power |
 | GND | --> | GND | Ground |
-| DIN | --> | GPIO 22 | MOSI (SPI data) |
-| CLK | --> | GPIO 23 | SCK (SPI clock) |
+| SDI | --> | GPIO 22 | MOSI (SPI data) |
+| SCK | --> | GPIO 23 | SPI clock |
 | CS | --> | GPIO 1 | Chip Select |
-| DC | --> | GPIO 2 | Data/Command (any GPIO) |
-| RST | --> | GPIO 3 | Reset (any GPIO) |
-| BUSY | --> | GPIO 4 | Busy signal (any GPIO) |
-| PWR | --> | 3V3 | **Important for Rev 2.3+** |
+| D/C | --> | GPIO 2 | Data/Command |
+| RES | --> | GPIO 3 | Reset |
+| BUSY | --> | GPIO 4 | Busy signal |
 
 ## Assembly Steps
 
-### Step 1: Solder Headers
+### Step 1: Solder Headers onto FireBeetle
 
-**FireBeetle ESP32-C6:**
-1. Insert male header pins into the holes
+1. Insert male header pins into the FireBeetle holes
 2. Pins should point **downward** (away from components)
 3. Solder from the top side
+4. Ensure good solder joints on all pins
 
-**E-Paper HAT:**
-- Should already have the 40-pin header
-- If separate header pins came with it, solder female header on the underside
+### Step 2: Connect E-Paper Display to DESPI-C02
 
-### Step 2: Locate E-Paper HAT Pins
+**Important: The FPC connector is fragile!**
 
-The E-Paper HAT uses a Raspberry Pi 40-pin header layout. The pins you need are:
-
-```
-E-Paper HAT 40-Pin Header (top view, USB port at bottom)
-         ┌─────────────────────────────────┐
-   3V3   │ (1)  (2) │ 5V                   │
-   SDA   │ (3)  (4) │ 5V                   │
-   SCL   │ (5)  (6) │ GND  <-- Use this    │
-         │ (7)  (8) │ TXD                  │
-   GND   │ (9) (10) │ RXD                  │
-   RST   │(11) (12) │ PWR  <-- Use this    │
-         │(13) (14) │ GND                  │
-         │(15) (16) │                      │
-   3V3   │(17) (18) │ BUSY <-- Use this    │
-   DIN   │(19) (20) │ GND                  │
-         │(21) (22) │ DC   <-- Use this    │
-   CLK   │(23) (24) │ CS   <-- Use this    │
-   GND   │(25) (26) │                      │
-         │    ...   │                      │
-         └─────────────────────────────────┘
-
-Pins to use:
-- Pin 1 or 17: VCC (3.3V)
-- Pin 6: GND
-- Pin 11: RST
-- Pin 12: PWR
-- Pin 18: BUSY
-- Pin 19: DIN (MOSI)
-- Pin 22: DC
-- Pin 23: CLK
-- Pin 24: CS
-```
+1. Locate the FPC connector on the DESPI-C02 (24-pin slot)
+2. **Gently lift** the black locking tab - it only tilts ~2-3mm, do NOT force it
+3. Slide the ribbon cable in straight (zero force required)
+4. Gold contacts typically face **UP** away from the PCB
+5. Push the locking tab back down until it clicks
+6. The "0.47" marking on the board refers to the RESE resistor option (for voltage/current settings), move the switch to the 2.7
 
 ### Step 3: Connect Jumper Wires
 
 Use female-to-female jumper wires:
 
-```
-E-Paper HAT (40-pin)          FireBeetle ESP32-C6
-    ┌─────────────┐               ┌───────────┐
-    │ VCC (Pin 1) │───────────────│ 3V3       │
-    │ GND (Pin 6) │───────────────│ GND       │
-    │ DIN (Pin 19)│───────────────│ GPIO 22   │
-    │ CLK (Pin 23)│───────────────│ GPIO 23   │
-    │ CS  (Pin 24)│───────────────│ GPIO 1    │
-    │ DC  (Pin 22)│───────────────│ GPIO 2    │
-    │ RST (Pin 11)│───────────────│ GPIO 3    │
-    │ BUSY(Pin 18)│───────────────│ GPIO 4    │
-    │ PWR (Pin 12)│───────────────│ 3V3       │
-    └─────────────┘               └───────────┘
+```text
+DESPI-C02                    FireBeetle ESP32-C6
+┌─────────────┐               ┌───────────────┐
+│ 3.3V        │───────────────│ 3V3           │
+│ GND         │───────────────│ GND           │
+│ SDI         │───────────────│ GPIO 22       │
+│ SCK         │───────────────│ GPIO 23       │
+│ CS          │───────────────│ GPIO 1        │
+│ D/C         │───────────────│ GPIO 2        │
+│ RES         │───────────────│ GPIO 3        │
+│ BUSY        │───────────────│ GPIO 4        │
+└─────────────┘               └───────────────┘
 ```
 
-### Step 4: Connect E-Paper Display
+### Step 4: Connect Battery (Optional)
 
-1. Gently insert the e-paper ribbon cable into the HAT's FPC connector
-2. Lift the black latch, insert cable (gold contacts facing down typically), press latch down
-3. **Handle carefully** - the display is fragile!
+1. Plug the JST connector into the FireBeetle's battery port
+2. **Verify polarity matches** - red wire to (+), black to (-)
+3. If polarity is reversed, swap the pins in the JST connector
 
 ## Software Configuration
 
@@ -152,38 +133,73 @@ lib_deps =
 
 ## Important Notes
 
-1. **PWR Pin (Rev 2.3+):** Must be connected to VCC or the display won't power on
-2. **BUSY Pin:** On some V2 models, may need to be inverted in software
-3. **Version Check:** Displays sold after Sept 2023 use different initialization - check which version you have
-4. **Power:** The FireBeetle can be powered via USB-C, solar, or LiPo battery
-5. **Deep Sleep:** ESP32-C6 draws only 16uA in deep sleep - perfect for battery operation
+1. **BUSY Pin:** On some display versions, may need to be inverted in software
+2. **Version Check:** Displays sold after Sept 2023 use different initialization
+3. **Power:** FireBeetle can be powered via USB-C, solar, or LiPo battery
+4. **Deep Sleep:** ESP32-C6 draws only 16uA in deep sleep - perfect for battery operation
 
 ## Verify Before Powering On
 
-- [ ] All 9 wires connected (VCC, GND, DIN, CLK, CS, DC, RST, BUSY, PWR)
+- [ ] All 8 wires connected (3.3V, GND, SDI, SCK, CS, D/C, RES, BUSY)
 - [ ] No shorts between adjacent pins
-- [ ] E-paper ribbon cable fully seated
+- [ ] E-paper ribbon cable fully seated in DESPI-C02
 - [ ] Headers soldered securely
+- [ ] Battery polarity correct (if using battery)
 
 ## Troubleshooting
 
 ### Display stays blank
-- Check PWR pin is connected to 3V3
-- Verify ribbon cable is fully inserted
-- Check all SPI connections
+
+- Verify ribbon cable is fully inserted and locked
+- Check all SPI connections with multimeter
+- Verify 3.3V power is reaching the DESPI-C02
 
 ### Display shows garbage or partial update
+
 - Verify you're using the correct display version in code (V2 vs V2_old)
-- Check BUSY pin connection and polarity setting
+- Check BUSY pin connection and polarity setting in software
 
 ### ESP32 crashes or resets
+
 - Check for shorts between pins
 - Verify 3.3V power is stable
-- Add decoupling capacitor if needed
+- Try powering from USB-C without battery first
+
+### Cannot upload - device stuck in deep sleep/hibernate
+
+If firmware goes into deep sleep immediately (e.g., due to low battery check), the USB disconnects and normal upload fails. To recover:
+
+**Method 1: Timed USB plug-in (most reliable)**
+1. Disconnect USB from the FireBeetle
+2. Run the upload command: `pio run -t upload`
+3. Wait for "Looking for upload port..." message
+4. Immediately plug in USB
+5. The upload should catch the device during enumeration
+
+**Method 2: Bootloader mode**
+1. Hold both BOOT and RESET buttons
+2. Release RESET (keep holding BOOT)
+3. Wait 1 second, then release BOOT
+4. Quickly run upload command
+
+**Prevention:** Always include a startup delay in firmware before any deep sleep decisions:
+```cpp
+void setup() {
+    delay(10000);  // 10-second window for firmware updates
+    // ... rest of setup
+}
+```
+
+### DESPI-C02 switch position
+
+The switch on the DESPI-C02 board sets the series resistor value:
+- **2.2** position: For 7.5" and larger displays (correct for this setup)
+- **0.47** position: For smaller displays (1.54" - 4.2")
 
 ## References
 
 - [DFRobot FireBeetle 2 ESP32-C6 Wiki](https://wiki.dfrobot.com/SKU_DFR1075_FireBeetle_2_Board_ESP32_C6)
 - [Waveshare 7.5inch e-Paper HAT Manual](https://www.waveshare.com/wiki/7.5inch_e-Paper_HAT_Manual)
 - [GxEPD2 Library & Hardware Guide](https://github.com/ZinggJM/GxEPD2)
-- [E-Paper Driver HAT Wiki](https://www.waveshare.com/wiki/E-Paper_Driver_HAT)
+- [GooDisplay DESPI-C02 on AliExpress](https://www.aliexpress.com/item/1005004633084221.html)
+- [GooDisplay Website](https://www.good-display.com/)

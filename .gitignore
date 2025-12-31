@@ -51,8 +51,11 @@ coverage/
 *.bak
 *.orig
 
-# Claude Code local settings
-.claude/settings.local.json
+# Claude Code
+.claude/
+
+# Python version
+.python-version
 
 # Node modules (if any web components)
 node_modules/
