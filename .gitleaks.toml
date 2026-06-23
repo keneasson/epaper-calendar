@@ -1,0 +1,42 @@
+# gitleaks configuration for the Calendar monorepo.
+# Runs in CI (.github/workflows/secrets-scan.yml) and the local pre-commit hook
+# (.githooks/pre-commit). Extends the built-in ruleset and adds a rule that
+# catches the failure mode this repo actually had: a WiFi password hardcoded as
+# a string literal in firmware source (see issue #3).
+
+title = "Calendar monorepo secret scan"
+
+[extend]
+useDefault = true
+
+# A hardcoded credential assigned to a password/psk-like identifier in source,
+# e.g.  const char* HOME_PASSWORD = "hunter2";
+# Catches C/C++ assignment and JS/TS object styles; #define-style config lives
+# only in gitignored config.h, guarded by .gitignore rather than this rule.
+[[rules]]
+id = "hardcoded-credential-assignment"
+description = "Hardcoded password/PSK string literal in source"
+regex = '''(?i)(password|passwd|pwd|psk|pre[-_]?shared[-_]?key)\s*[:=]\s*"[^"]{6,63}"'''
+keywords = ["password", "passwd", "psk"]
+
+[rules.allowlist]
+regexTarget = "match"
+regexes = [
+  '''(?i)your[a-z]*(password|ssid|key)''',  # template placeholders
+  '''process\.env''',                        # reading from env, not a literal
+  '''getenv''',
+  '''(?i)password\s*[:=]\s*"(\*+|x+|redacted|changeme|example)"''',
+]
+
+[allowlist]
+description = "Repo-wide allowlist: templates, docs, and tracked test fixtures"
+paths = [
+  '''.*config_template\.h$''',   # placeholder-only templates
+  '''.*\.gitleaks\.toml$''',     # this file (contains the patterns themselves)
+  '''.*/simulation/api_response\.json$''',  # mock calendar data, no secrets
+]
+# Example/illustrative values that are not real secrets.
+regexes = [
+  '''YourWiFiPassword''',
+  '''Your[A-Za-z]*(Password|SSID|Key)''',
+]

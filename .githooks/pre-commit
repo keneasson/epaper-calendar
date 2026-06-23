@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+#
+# Pre-commit secret scan. Enable once per clone with:
+#
+#     git config core.hooksPath .githooks
+#
+# Uses gitleaks if installed (accurate, honours .gitleaks.toml). Falls back to a
+# targeted grep so the hook still provides a backstop on machines without it.
+# Either way it scans only STAGED changes, so gitignored config.h is never seen.
+
+set -euo pipefail
+
+red()  { printf '\033[31m%s\033[0m\n' "$1" >&2; }
+ylw()  { printf '\033[33m%s\033[0m\n' "$1" >&2; }
+
+repo_root="$(git rev-parse --show-toplevel)"
+
+if command -v gitleaks >/dev/null 2>&1; then
+  if ! gitleaks protect --staged --redact -c "${repo_root}/.gitleaks.toml"; then
+    red "✖ gitleaks found a secret in your staged changes — commit aborted."
+    red "  Review the finding above. If it is a false positive, allowlist it in .gitleaks.toml."
+    exit 1
+  fi
+  exit 0
+fi
+
+ylw "⚠ gitleaks not installed — using a basic grep fallback (install: brew install gitleaks)."
+
+# Fallback: flag a string literal assigned to a password/psk-like identifier in
+# added lines, excluding template placeholders and env reads.
+if git diff --cached -U0 --diff-filter=ACM \
+     | grep -nEi '^\+.*(password|passwd|pwd|psk)[[:space:]]*[:=][[:space:]]*"[^"]{6,}"' \
+     | grep -viE 'your[a-z]*(password|ssid|key)|process\.env|getenv|redacted|changeme|example' ; then
+  red "✖ Possible hardcoded credential in staged changes — commit aborted."
+  red "  Move it to a gitignored config.h, or allowlist if it is not a secret."
+  exit 1
+fi
+
+exit 0
