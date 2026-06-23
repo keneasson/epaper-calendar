@@ -20,12 +20,20 @@ regex = '''(?i)(password|passwd|pwd|psk|pre[-_]?shared[-_]?key)\s*[:=]\s*"[^"]{6
 keywords = ["password", "passwd", "psk"]
 
 [rules.allowlist]
+# This heuristic is for SHIPPED SOURCE. Docs and templates must show example
+# credentials to be useful, so scope the rule away from them - real keys/tokens
+# in those files are still caught by gitleaks' built-in rules.
+paths = [
+  '''.*\.md$''',                 # documentation (shows WIFI_PASSWORD = "..." examples)
+  '''.*config_template\.h$''',   # placeholder-only templates
+  '''.*/simulation/.*''',        # native-sim mock data and stubs
+]
 regexTarget = "match"
 regexes = [
-  '''(?i)your[a-z]*(password|ssid|key)''',  # template placeholders
-  '''process\.env''',                        # reading from env, not a literal
+  '''process\.env''',  # reading from env, not a literal
   '''getenv''',
-  '''(?i)password\s*[:=]\s*"(\*+|x+|redacted|changeme|example)"''',
+  '''(?i)your[\s_\-]*(wifi[\s_\-]*)?(password|passwd|pwd|ssid|key|secret|token)''',
+  '''(?i)(changeme|change[\s_\-]?me|placeholder|example|dummy|sample)''',
 ]
 
 [allowlist]
@@ -35,8 +43,12 @@ paths = [
   '''.*\.gitleaks\.toml$''',     # this file (contains the patterns themselves)
   '''.*/simulation/api_response\.json$''',  # mock calendar data, no secrets
 ]
-# Example/illustrative values that are not real secrets.
+# Documentation/template placeholder values that are not real secrets. Matched
+# against the captured secret, case-insensitively, allowing the common styles:
+# YOUR_WIFI_PASSWORD, YourWiFiPassword, your-password, <your password>, etc.
 regexes = [
-  '''YourWiFiPassword''',
-  '''Your[A-Za-z]*(Password|SSID|Key)''',
+  '''(?i)your[\s_\-]*(wifi[\s_\-]*)?(password|passwd|pwd|ssid|key|secret|token)''',
+  '''(?i)(example|changeme|change[\s_\-]?me|placeholder|redacted|dummy|sample)''',
+  '''(?i)^x{3,}$''',
+  '''(?i)<[^>]*(password|secret|key|token|ssid)[^>]*>''',
 ]
