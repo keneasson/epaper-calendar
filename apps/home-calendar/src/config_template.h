@@ -16,8 +16,15 @@
 
 #define WIFI_SSID           "YourWiFiName"
 #define WIFI_PASSWORD       "YourWiFiPassword"
-#define WIFI_TIMEOUT_MS     20000   // 20 seconds
-#define WIFI_MAX_RETRIES    3
+// Per-attempt timeout = WIFI_TIMEOUT_MS / WIFI_MAX_RETRIES (15s). Connection
+// attempts walk a gateway-compatibility ladder (see wifi_manager.cpp). 15s is
+// a CEILING, not the expected duration: it must outlast the driver's own
+// verdict latency (full-channel scan + auth retries + the multi-round SAE
+// handshake on WPA3-transition gateways) so the real 802.11 reason code lands
+// inside the window. Failed attempts bail out early the moment the driver
+// reports a reason, so typical failures cost ~5-8s, not the full 15.
+#define WIFI_TIMEOUT_MS     60000   // 15s per attempt (= WIFI_TIMEOUT_MS / WIFI_MAX_RETRIES)
+#define WIFI_MAX_RETRIES    4
 
 // ============================================================================
 // API (AWS Lambda endpoint)
