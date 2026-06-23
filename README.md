@@ -1,37 +1,41 @@
-# E-Paper Calendar
+# Calendar Display Projects
 
 A monorepo for ESP32-based display projects, including e-paper church schedule displays and LCD development boards.
 
 ## Repository Structure
 
 ```
-epaper-calendar/
+Calendar/
 ├── apps/                    # Application projects
-│   ├── epaper-calendar/     # Church schedule e-paper display
-│   ├── lcd-demo/            # ESP32-S3-LCD-1.47B demo with LovyanGFX
-│   └── lcd_control/         # LCD control experiments
+│   ├── church-calendar/     # Church schedule e-paper display
+│   ├── ble-idf-test/        # ESP32-S3 BLE WiFi provisioner
+│   ├── ble-test/            # ESP32-C6 BLE server
+│   └── ...
 ├── docs/                    # Shared documentation
-├── libs/                    # Shared libraries
+├── libs/                    # Shared libraries (e.g., WaveshareS3LCD147)
 └── reference/               # Reference implementations & vendor demos
-    └── waveshare-esp32s3-lcd-demo/
 ```
 
 ## Apps
 
-### epaper-calendar
+### church-calendar
 Church schedule display for 7.5" e-paper. Connects to WiFi, fetches schedule from API, renders it, then enters deep sleep for months of battery life.
 
-**Hardware:** DFRobot FireBeetle 2 ESP32-E, Waveshare 7.5" E-Paper (800x480)
+**Hardware:** DFRobot FireBeetle 2 ESP32-C6, Waveshare 7.5" E-Paper (800x480)
 
-[Full documentation →](apps/epaper-calendar/README.md)
+[Full documentation →](apps/church-calendar/README.md)
 
-### lcd-demo
-Demo application for the Waveshare ESP32-S3-LCD-1.47B development board. Features:
-- Smooth anti-aliased fonts with LovyanGFX
+### ble-idf-test (S3 WiFi Provisioner)
+BLE client on Waveshare ESP32-S3-LCD-1.47B that scans WiFi networks, sends credentials to a C6 via BLE.
 - Tilt-based navigation using QMI8658 IMU
-- Auto-sleep after 5 minutes of inactivity
+- Color LCD display
 
 **Hardware:** Waveshare ESP32-S3-LCD-1.47B (172x320 ST7789 IPS display)
+
+### ble-test (C6 BLE Server)
+BLE server on FireBeetle C6 with battery service, WiFi config service, and deep sleep support.
+
+**Hardware:** DFRobot FireBeetle 2 ESP32-C6
 
 ## Quick Start
 
@@ -39,7 +43,7 @@ Each app is a standalone PlatformIO project:
 
 ```bash
 # Build an app
-cd apps/epaper-calendar
+cd apps/church-calendar
 pio run
 
 # Upload to device

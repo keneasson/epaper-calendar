@@ -33,7 +33,7 @@ static void safe_copy(char* dest, const char* src, size_t maxLen) {
     dest[maxLen - 1] = '\0';
 }
 
-static ResultCode parse_json(const char* json, Schedule& schedule) {
+static ResultCode parse_json(const char* json, Schedule& schedule, int weekOffset) {
     DynamicJsonDocument doc(JSON_BUFFER_SIZE);
 
     DeserializationError error = deserializeJson(doc, json);
@@ -44,13 +44,19 @@ static ResultCode parse_json(const char* json, Schedule& schedule) {
 
     schedule.clear();
 
-    // API returns an array - get the first (upcoming) service
+    // API returns an array - get the requested week's service
     if (!doc.is<JsonArray>() || doc.size() == 0) {
         LOG("API: Expected non-empty array");
         return ResultCode::InvalidResponse;
     }
 
-    JsonObject service = doc[0];
+    // Check if requested week exists in the array
+    if (weekOffset >= (int)doc.size()) {
+        LOGF("API: Week offset %d not available (array size: %d)\n", weekOffset, doc.size());
+        return ResultCode::InvalidResponse;
+    }
+
+    JsonObject service = doc[weekOffset];
 
     // Extract service fields
     safe_copy(schedule.serviceDate, service["Date"] | "", MAX_DATE_LENGTH);
@@ -64,13 +70,13 @@ static ResultCode parse_json(const char* json, Schedule& schedule) {
     // Lunch is planned if the "Lunch" field is present
     schedule.hasLunch = service.containsKey("Lunch");
 
-    LOGF("API: Parsed service for %s\n", schedule.serviceDate);
+    LOGF("API: Parsed service for %s (week offset: %d)\n", schedule.serviceDate, weekOffset);
     return ResultCode::Success;
 }
 
 #if defined(NATIVE_BUILD)
 // Native build simulation
-static ResultCode fetch_once(Schedule& schedule) {
+static ResultCode fetch_once(Schedule& schedule, int weekOffset) {
     HTTPClient http;
     LOGF("API: Fetching from %s\n", API_ENDPOINT);
     http.begin(API_ENDPOINT);
@@ -91,12 +97,12 @@ static ResultCode fetch_once(Schedule& schedule) {
         LOG("API: Empty response");
         return ResultCode::InvalidResponse;
     }
-    return parse_json(response.c_str(), schedule);
+    return parse_json(response.c_str(), schedule, weekOffset);
 }
 
 #else
 // ESP32 - use Arduino HTTPClient with NetworkClientSecure for HTTPS
-static ResultCode fetch_once(Schedule& schedule) {
+static ResultCode fetch_once(Schedule& schedule, int weekOffset) {
     HTTPClient http;
     LOGF("API: Fetching from %s\n", API_ENDPOINT);
 
@@ -139,17 +145,17 @@ static ResultCode fetch_once(Schedule& schedule) {
         return ResultCode::InvalidResponse;
     }
 
-    return parse_json(response.c_str(), schedule);
+    return parse_json(response.c_str(), schedule, weekOffset);
 }
 #endif
 
-ResultCode api_fetch_schedule(Schedule& schedule) {
-    LOG("API: Starting fetch");
+ResultCode api_fetch_schedule(Schedule& schedule, int weekOffset) {
+    LOGF("API: Starting fetch (week offset: %d)\n", weekOffset);
 
     for (int attempt = 1; attempt <= API_MAX_RETRIES; attempt++) {
         LOGF("API: Attempt %d/%d\n", attempt, API_MAX_RETRIES);
 
-        ResultCode result = fetch_once(schedule);
+        ResultCode result = fetch_once(schedule, weekOffset);
 
         if (result == ResultCode::Success) {
             LOG("API: Fetch successful");

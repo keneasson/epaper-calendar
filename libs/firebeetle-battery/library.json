@@ -1,0 +1,13 @@
+{
+    "name": "FireBeetleBattery",
+    "version": "1.0.0",
+    "description": "Battery level reading for DFRobot FireBeetle 2 boards (ESP32-E and ESP32-C6)",
+    "keywords": ["battery", "firebeetle", "dfrobot", "esp32", "adc"],
+    "authors": [
+        {
+            "name": "Ken Easson"
+        }
+    ],
+    "frameworks": "arduino",
+    "platforms": ["espressif32"]
+}

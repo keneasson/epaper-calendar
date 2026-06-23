@@ -1,0 +1,14 @@
+# Dependencies
+node_modules/
+
+# SST
+.sst/
+.build/
+
+# Environment
+.env
+.env.local
+
+# Google credentials (NEVER commit)
+*-credentials.json
+service-account.json

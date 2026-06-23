@@ -34,37 +34,57 @@
 static constexpr int SCREEN_WIDTH = 480;
 static constexpr int SCREEN_HEIGHT = 800;
 
-// Layout constants - Portrait orientation
+// Layout constants - Portrait orientation (480x800)
+// Designed for even vertical distribution with comfortable spacing
 namespace Layout {
     // Margins
     constexpr int MARGIN_LEFT = 30;
     constexpr int MARGIN_RIGHT = 30;
 
-    // Header section (two lines)
-    constexpr int HEADER_Y = 50;
-    constexpr int HEADER_LINE_HEIGHT = 45;  // More spacing between lines
-    constexpr int DIVIDER_TOP_Y = 140;
+    // Header section (two lines) - zone 0-150
+    // 24pt font ~35px tall, two lines ~80px total, centered in 150px zone
+    constexpr int HEADER_Y = 65;              // Was 50 - moved down for centering
+    constexpr int HEADER_LINE_HEIGHT = 48;    // Was 45 - slightly more breathing room
+    constexpr int DIVIDER_TOP_Y = 150;        // Was 140
 
-    // Date section
-    constexpr int DATE_Y = 185;
-    constexpr int DIVIDER_DATE_Y = 210;
+    // Date section - zone 150-225
+    constexpr int DATE_Y = 195;               // Was 185 - centered in zone
+    constexpr int DIVIDER_DATE_Y = 225;       // Was 210
 
-    // Service roles section
-    constexpr int ROLES_START_Y = 260;
+    // Service roles section - zone 225-620 (~395px for 6 roles = 65px each)
+    constexpr int ROLES_START_Y = 280;        // Was 260 - more top margin
     constexpr int ROLE_LABEL_X = MARGIN_LEFT;
-    constexpr int ROLE_VALUE_X = 220;  // More space for labels
-    constexpr int ROLE_LINE_HEIGHT = 52;
+    constexpr int ROLE_VALUE_X = 185;         // Tight gap after labels (~1 "m" width)
+    constexpr int ROLE_LINE_HEIGHT = 58;      // Was 52 - even spacing for 6 roles
 
-    // Collection section (after roles)
-    constexpr int COLLECTION_Y = 530;
+    // Collection section (6th role, calculated: 280 + 5*58 = 570)
+    constexpr int COLLECTION_Y = 570;         // Was 530
 
-    // Fellowship message section
-    constexpr int MESSAGE_Y = 620;
-    constexpr int MESSAGE_LINE_HEIGHT = 30;
+    // Fellowship message section - zone 620-740
+    constexpr int MESSAGE_Y = 665;            // Was 620 - better centered
+    constexpr int MESSAGE_LINE_HEIGHT = 32;   // Was 30
 
-    // Footer section
-    constexpr int DIVIDER_BOTTOM_Y = 740;
-    constexpr int FOOTER_Y = 770;
+    // Footer section - zone 740-800
+    constexpr int DIVIDER_BOTTOM_Y = 745;     // Was 740
+    constexpr int FOOTER_Y = 778;             // Was 770
+}
+
+// Layout constants for "Next Week" mode - smaller header, red date banner
+namespace NextWeekLayout {
+    // Header section - smaller font, tighter spacing
+    constexpr int HEADER_Y = 55;
+    constexpr int HEADER_LINE_HEIGHT = 38;
+    constexpr int DIVIDER_TOP_Y = 130;
+
+    // Date banner section - RED background with WHITE text (full width, no gap)
+    constexpr int DATE_BANNER_Y = 131;        // Starts right after divider (no gap)
+    constexpr int DATE_BANNER_HEIGHT = 90;    // Banner height
+    constexpr int DATE_LINE1_Y = 162;         // "Next Sunday"
+    constexpr int DATE_LINE2_Y = 202;         // "January 11, 2026"
+    constexpr int DIVIDER_DATE_Y = 221;       // Line after date section (inside banner)
+
+    // Roles start lower to accommodate taller date section
+    constexpr int ROLES_START_Y = 280;
 }
 
 // Display instance - different for 3-color vs B/W
@@ -90,11 +110,16 @@ static int get_center_x(const char* text, const GFXfont* font) {
     return (x < 0) ? 0 : x;  // Clamp to screen bounds
 }
 
-// Draw a horizontal line
+// Draw a horizontal line (with margins)
 static void draw_divider(int y) {
     display.drawLine(Layout::MARGIN_LEFT, y,
                      SCREEN_WIDTH - Layout::MARGIN_RIGHT, y,
                      GxEPD_BLACK);
+}
+
+// Draw a full-width horizontal line (edge to edge)
+static void draw_divider_full_width(int y) {
+    display.drawLine(0, y, SCREEN_WIDTH, y, GxEPD_BLACK);
 }
 
 // Helper to render a role line: "Label: Value"
@@ -118,6 +143,72 @@ static void render_header() {
     display.print(CHURCH_NAME_LINE2);
 
     draw_divider(Layout::DIVIDER_TOP_Y);
+}
+
+// Render header for "Next Week" mode - smaller font
+static void render_next_week_header() {
+    display.setFont(&FreeSansBold18pt7b);  // Smaller than normal header
+    display.setCursor(get_center_x(CHURCH_NAME_LINE1, &FreeSansBold18pt7b), NextWeekLayout::HEADER_Y);
+    display.print(CHURCH_NAME_LINE1);
+    display.setCursor(get_center_x(CHURCH_NAME_LINE2, &FreeSansBold18pt7b), NextWeekLayout::HEADER_Y + NextWeekLayout::HEADER_LINE_HEIGHT);
+    display.print(CHURCH_NAME_LINE2);
+
+    draw_divider_full_width(NextWeekLayout::DIVIDER_TOP_Y);
+}
+
+// Extract "Month Day, Year" from "Sunday, January 11, 2026" -> "January 11, 2026"
+static void extract_date_without_day(const char* fullDate, char* output, size_t outputSize) {
+    // Find first comma (after day name)
+    const char* firstComma = strchr(fullDate, ',');
+    if (firstComma && firstComma[1] == ' ') {
+        // Copy everything after ", " to output
+        strncpy(output, firstComma + 2, outputSize - 1);
+        output[outputSize - 1] = '\0';
+    } else {
+        // Fallback: just copy the original
+        strncpy(output, fullDate, outputSize - 1);
+        output[outputSize - 1] = '\0';
+    }
+}
+
+// Render date section for "Next Week" mode - RED banner with WHITE text
+static void render_next_week_date(const char* dateStr) {
+#if DISPLAY_3COLOR
+    // Draw RED filled rectangle for the banner (full width, edge to edge)
+    display.fillRect(0, NextWeekLayout::DATE_BANNER_Y,
+                     SCREEN_WIDTH,
+                     NextWeekLayout::DATE_BANNER_HEIGHT,
+                     GxEPD_RED);
+
+    // "Next Sunday" - WHITE text on RED background
+    display.setFont(&FreeSansBold18pt7b);
+    display.setTextColor(GxEPD_WHITE);
+    const char* line1 = "Next Sunday";
+    display.setCursor(get_center_x(line1, &FreeSansBold18pt7b), NextWeekLayout::DATE_LINE1_Y);
+    display.print(line1);
+
+    // Extract date without day name: "January 11, 2026"
+    char dateLine[64];
+    extract_date_without_day(dateStr, dateLine, sizeof(dateLine));
+
+    display.setCursor(get_center_x(dateLine, &FreeSansBold18pt7b), NextWeekLayout::DATE_LINE2_Y);
+    display.print(dateLine);
+
+    display.setTextColor(GxEPD_BLACK);  // Reset to black
+#else
+    // B/W fallback: just show the text without banner
+    display.setFont(&FreeSansBold18pt7b);
+    const char* line1 = "Next Sunday";
+    display.setCursor(get_center_x(line1, &FreeSansBold18pt7b), NextWeekLayout::DATE_LINE1_Y);
+    display.print(line1);
+
+    char dateLine[64];
+    extract_date_without_day(dateStr, dateLine, sizeof(dateLine));
+    display.setCursor(get_center_x(dateLine, &FreeSansBold18pt7b), NextWeekLayout::DATE_LINE2_Y);
+    display.print(dateLine);
+#endif
+
+    draw_divider_full_width(NextWeekLayout::DIVIDER_DATE_Y);
 }
 
 // Render the service date (remove commas, red on 3-color display)
@@ -212,7 +303,7 @@ static void draw_battery_indicator(int x, int y, int percentage) {
 
 // Render footer section (last update time, battery indicator)
 static void render_footer(const BatteryStatus& battery) {
-    draw_divider(Layout::DIVIDER_BOTTOM_Y);
+    draw_divider_full_width(Layout::DIVIDER_BOTTOM_Y);
 
     display.setFont(&FreeSans9pt7b);
 
@@ -228,6 +319,8 @@ static void render_footer(const BatteryStatus& battery) {
     }
 
     // Graphical battery indicator (right-aligned)
+    // Skip if battery monitoring is disabled (hardware not connected)
+#if !defined(BATTERY_MONITORING_DISABLED) || !BATTERY_MONITORING_DISABLED
     if (SHOW_BATTERY) {
         int battX = SCREEN_WIDTH - Layout::MARGIN_RIGHT - 50;
         int battY = Layout::FOOTER_Y - 14;
@@ -247,6 +340,7 @@ static void render_footer(const BatteryStatus& battery) {
         display.setTextColor(GxEPD_BLACK);  // Reset to black
 #endif
     }
+#endif
 }
 
 void display_init() {
@@ -262,8 +356,8 @@ void display_init() {
     LOG("Display: Ready");
 }
 
-void display_schedule(const Schedule& schedule, const BatteryStatus& battery) {
-    LOG("Display: Rendering schedule");
+void display_schedule(const Schedule& schedule, const BatteryStatus& battery, DisplayMode mode) {
+    LOGF("Display: Rendering schedule (mode: %s)\n", mode == DISPLAY_MODE_NEXT_WEEK ? "next_week" : "current");
 
     display.setFullWindow();
     display.firstPage();
@@ -271,8 +365,16 @@ void display_schedule(const Schedule& schedule, const BatteryStatus& battery) {
     do {
         display.fillScreen(GxEPD_WHITE);
 
-        render_header();
-        render_date(schedule.serviceDate);
+        if (mode == DISPLAY_MODE_NEXT_WEEK) {
+            // Next week mode: smaller header, red date banner
+            render_next_week_header();
+            render_next_week_date(schedule.serviceDate);
+        } else {
+            // Current week mode: normal layout
+            render_header();
+            render_date(schedule.serviceDate);
+        }
+
         render_roles(schedule);
         render_collection(schedule);
         render_message(schedule);
@@ -433,8 +535,8 @@ void display_init() {
     LOG("Display: Ready");
 }
 
-void display_schedule(const Schedule& schedule, const BatteryStatus& battery) {
-    LOG("Display: Rendering schedule (simulation)");
+void display_schedule(const Schedule& schedule, const BatteryStatus& battery, DisplayMode mode) {
+    LOGF("Display: Rendering schedule (simulation, mode: %s)\n", mode == DISPLAY_MODE_NEXT_WEEK ? "next_week" : "current");
 
     display.setFullWindow();
     display.firstPage();

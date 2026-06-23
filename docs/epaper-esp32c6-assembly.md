@@ -102,7 +102,7 @@ DESPI-C02                    FireBeetle ESP32-C6
 
 ## Software Configuration
 
-For your `apps/epaper-calendar` project, create or update the pin definitions:
+For your `apps/church-calendar` project, create or update the pin definitions:
 
 ```cpp
 // ESP32-C6 Pin Definitions for Waveshare 7.5" E-Paper

@@ -1,0 +1,19 @@
+{
+  "name": "home-calendar-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "sst dev",
+    "deploy": "sst deploy --stage keneasson",
+    "remove": "sst remove --stage keneasson"
+  },
+  "dependencies": {
+    "googleapis": "^144.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "sst": "^3.0.0",
+    "typescript": "^5.0.0"
+  }
+}

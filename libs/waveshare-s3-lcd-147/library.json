@@ -1,0 +1,16 @@
+{
+    "name": "WaveshareS3LCD147",
+    "version": "1.0.0",
+    "description": "LovyanGFX display driver for Waveshare ESP32-S3-LCD-1.47B",
+    "keywords": ["display", "lcd", "st7789", "waveshare", "esp32-s3", "lovyangfx"],
+    "authors": [
+        {
+            "name": "Ken Easson"
+        }
+    ],
+    "frameworks": "arduino",
+    "platforms": "espressif32",
+    "dependencies": {
+        "lovyan03/LovyanGFX": "^1.1.0"
+    }
+}
