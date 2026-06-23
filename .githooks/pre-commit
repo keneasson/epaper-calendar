@@ -26,13 +26,29 @@ fi
 
 ylw "⚠ gitleaks not installed — using a basic grep fallback (install: brew install gitleaks)."
 
-# Fallback: flag a string literal assigned to a password/psk-like identifier in
-# added lines, excluding template placeholders and env reads.
-if git diff --cached -U0 --diff-filter=ACM \
-     | grep -nEi '^\+.*(password|passwd|pwd|psk)[[:space:]]*[:=][[:space:]]*"[^"]{6,}"' \
-     | grep -viE 'your[a-z]*(password|ssid|key)|process\.env|getenv|redacted|changeme|example' ; then
+# Files where credential-shaped strings are expected (templates, docs, and the
+# scanner's own config/example patterns). Mirrors the allowlist in
+# .gitleaks.toml so the fallback agrees with real gitleaks.
+allow_path='(config_template\.h|\.gitleaks\.toml|\.githooks/|/simulation/api_response\.json|\.md)$'
+
+# Scan only added lines in non-allowlisted files for a string literal assigned
+# to a password/psk-like identifier, excluding placeholders and env reads.
+flagged=0
+while IFS= read -r path; do
+  case "$path" in
+    *) printf '%s\n' "$path" | grep -qE "$allow_path" && continue ;;
+  esac
+  if git diff --cached -U0 --diff-filter=ACM -- "$path" \
+       | grep -nEi '^\+.*(password|passwd|pwd|psk)[[:space:]]*[:=][[:space:]]*"[^"]{6,}"' \
+       | grep -viE 'your[a-z]*(password|ssid|key)|process\.env|getenv|redacted|changeme|example' ; then
+    red "  ^ in: $path"
+    flagged=1
+  fi
+done < <(git diff --cached --name-only --diff-filter=ACM)
+
+if [ "$flagged" -eq 1 ]; then
   red "✖ Possible hardcoded credential in staged changes — commit aborted."
-  red "  Move it to a gitignored config.h, or allowlist if it is not a secret."
+  red "  Move it to a gitignored config.h, or allowlist in .gitleaks.toml if not a secret."
   exit 1
 fi
 
