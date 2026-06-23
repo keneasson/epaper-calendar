@@ -41,6 +41,8 @@ Calendar/
 - **Self-service errors:** failures render as plain language on the panel — e.g. *"Your router is rejecting your connection"* — instead of an opaque code
 - **Months on a charge:** deep sleep between hourly sync checks; the SPIFFS cache redraws the last-known calendar when the network is down
 
+[Full firmware documentation →](apps/home-calendar/README.md)
+
 ## Quick start
 
 Firmware apps are standalone [PlatformIO](https://platformio.org/) projects:
