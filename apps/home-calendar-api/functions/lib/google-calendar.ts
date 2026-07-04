@@ -103,21 +103,39 @@ function parseEvent(event: calendar_v3.Schema$Event): CalendarEvent | null {
   };
 }
 
-// Generate month info for current month
-function getMonthInfo(): MonthInfo {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1; // 1-indexed
+// The display's local timezone. The device renders "today" and the month grid
+// in this zone, so the backend must compute the grid and the day boundary here
+// too - not in the Lambda's UTC clock. Overridable per deployment.
+const DISPLAY_TZ = process.env.DISPLAY_TIMEZONE || "America/Toronto";
 
-  // First day of current month
-  const firstDay = new Date(year, month - 1, 1);
-  const firstDayOfWeek = firstDay.getDay(); // 0 = Sunday
+// Year/month/day as seen in the given timezone (NOT the Lambda's UTC clock).
+// Used both for the month grid and for the day-boundary stamp in the ETag, so a
+// new local day forces a fresh 200 exactly at local midnight.
+function getLocalDateParts(
+  date: Date,
+  timeZone: string
+): { year: number; month: number; day: number } {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const get = (type: string) =>
+    parseInt(parts.find((p) => p.type === type)!.value, 10);
+  return { year: get("year"), month: get("month"), day: get("day") };
+}
 
-  // Days in current month
-  const daysInMonth = new Date(year, month, 0).getDate();
+// Generate month info for the current month IN THE DISPLAY TIMEZONE.
+function getMonthInfo(now: Date): MonthInfo {
+  const { year, month } = getLocalDateParts(now, DISPLAY_TZ);
 
-  // Days in previous month
-  const daysInPrevMonth = new Date(year, month - 1, 0).getDate();
+  // Day-of-week of the 1st and the month lengths are fixed calendar facts for a
+  // given year+month. Build them from UTC so the Lambda's offset can't shift the
+  // 1st back into the previous day (the bug the old local-time construction had).
+  const firstDayOfWeek = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const daysInPrevMonth = new Date(Date.UTC(year, month - 1, 0)).getUTCDate();
 
   return {
     year,
@@ -194,9 +212,9 @@ export async function fetchCalendarData(
       // All-day event
       day = parseInt(event.start.date.split("-")[2]);
     } else if (event.start?.dateTime) {
-      // Timed event - extract day in local timezone
-      const eventDate = new Date(event.start.dateTime);
-      day = eventDate.getDate();
+      // Timed event - extract the day in the DISPLAY timezone so an evening
+      // event doesn't land on the wrong grid cell (getDate() would use UTC).
+      day = getLocalDateParts(new Date(event.start.dateTime), DISPLAY_TZ).day;
     } else {
       continue;
     }
@@ -213,11 +231,29 @@ export async function fetchCalendarData(
   // Sort month events by day
   monthEvents.sort((a, b) => a.day - b.day);
 
-  // Generate etag from response data using SHA256 hash
-  // Include start times and titles so rescheduled/renamed events change the etag
+  const month = getMonthInfo(now);
+
+  // Generate etag from response data using SHA256 hash.
+  //
+  // It MUST cover more than event content. The month grid layout and the
+  // highlighted "today" roll over at the local day/month boundary even when no
+  // event changed. If the ETag hashed only appointments/monthEvents, an
+  // unchanged-events day boundary would return 304 and freeze the device on the
+  // previous day's/month's grid (the confirmed "stuck showing June on July 3"
+  // failure). So we also hash:
+  //   - `localDate`: the current day in the display timezone -> forces exactly
+  //     one fresh 200 per local day (moves the "today" box, ages off past
+  //     appointments), while staying stable *within* a day (no hourly redraws).
+  //   - `month`: the full grid layout -> any month rollover changes the ETag.
+  // Start times and titles are still included so rescheduled/renamed events
+  // also change the ETag.
+  const { year, month: mm, day: dd } = getLocalDateParts(now, DISPLAY_TZ);
+  const localDate = `${year}-${mm}-${dd}`;
   const etag = createHash("sha256")
     .update(
       JSON.stringify({
+        localDate,
+        month,
         appointments: appointments.map((a) => ({
           id: a.id,
           start: a.start,
@@ -236,6 +272,6 @@ export async function fetchCalendarData(
     },
     appointments,
     monthEvents,
-    month: getMonthInfo(),
+    month,
   };
 }

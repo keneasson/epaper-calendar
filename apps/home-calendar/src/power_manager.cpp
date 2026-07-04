@@ -24,6 +24,13 @@
 // Fallback sleep duration if time sync fails
 static constexpr long DEFAULT_SLEEP_SECONDS = 3600;  // 1 hour
 
+// Disconnect backoff bounds: first failure waits BASE, then doubles each
+// further consecutive failure up to MAX. Keeps a battery alive through a
+// multi-day router/internet outage while still reconnecting within hours of
+// the network returning.
+static constexpr long BACKOFF_BASE_SECONDS = 3600;   // 1 hour (first failure)
+static constexpr long BACKOFF_MAX_SECONDS  = 28800;  // 8 hours (cap)
+
 // Maximum NTP sync wait time
 static constexpr int NTP_SYNC_TIMEOUT_MS = 10000;
 
@@ -158,6 +165,24 @@ long power_calculate_sleep_time() {
              DATE_CHANGE_HOUR, sleepSeconds);
         return sleepSeconds;
     }
+}
+
+long power_backoff_sleep_seconds(uint32_t consecutiveFailures) {
+    if (consecutiveFailures <= 1) {
+        return BACKOFF_BASE_SECONDS;
+    }
+    // Double the wait for each additional consecutive failure, capped. A loop
+    // (rather than 1 << n) avoids any shift overflow on a runaway count.
+    long seconds = BACKOFF_BASE_SECONDS;
+    for (uint32_t i = 1; i < consecutiveFailures && seconds < BACKOFF_MAX_SECONDS; i++) {
+        seconds *= 2;
+    }
+    if (seconds > BACKOFF_MAX_SECONDS) {
+        seconds = BACKOFF_MAX_SECONDS;
+    }
+    LOGF("Power: Backoff sleep for %ld sec (%u consecutive failures)\n",
+         seconds, consecutiveFailures);
+    return seconds;
 }
 
 void power_enter_sleep(long seconds) {

@@ -24,6 +24,14 @@ ResultCode power_sync_time();
 // Wakes at 6am, 12pm, and 6pm daily
 long power_calculate_sleep_time();
 
+// Calculate the deep-sleep duration to use after a failed wake (WiFi/API down,
+// serving stale cache). Backs off exponentially with the number of consecutive
+// failures so a router/internet outage doesn't drain the battery by retrying
+// every hour: 1h -> 2h -> 4h -> 8h (capped). Pass the running failure count
+// (>=1). On the next success the caller resets its count and returns to the
+// normal power_calculate_sleep_time() cadence.
+long power_backoff_sleep_seconds(uint32_t consecutiveFailures);
+
 // Enter deep sleep for the specified duration (seconds)
 // Also enables button wake-up
 // This function does not return

@@ -108,13 +108,26 @@ uint8_t FireBeetleBattery::voltageToPercentage(float voltage) {
     return static_cast<uint8_t>(percentage);
 }
 
-// Check if USB power is connected (affects battery readings)
+// Check if USB power is connected (affects battery readings).
+//
+// There is no VBUS-sense GPIO on this wiring, so USB power cannot be measured
+// directly. The only meaningful signal is the native USB-CDC port's connected
+// state - and that only exists on a USB-CDC-on-boot build (the diag/bench env).
+//
+// The previous heuristic, `Serial && Serial.availableForWrite() > 0`, did NOT
+// detect USB at all: on a production build Serial is UART0, whose TX buffer
+// always has space, so it returned true forever and the field display showed a
+// permanent "USB" box instead of the real battery gauge. On USB-CDC it reads 0
+// until a host opens the port, inverting the result. Both are wrong.
 static bool isUsbConnected() {
-#if defined(CONFIG_IDF_TARGET_ESP32C6) || defined(ESP32_C6_BUILD)
-    // On ESP32-C6 with USB-CDC, check if Serial is connected via USB
-    // This is a heuristic - when USB is connected, battery ADC may be inaccurate
-    return Serial && Serial.availableForWrite() > 0;
+#if defined(ARDUINO_USB_CDC_ON_BOOT) && ARDUINO_USB_CDC_ON_BOOT
+    // Bench/diag build: Serial IS the native USB port. HWCDC::operator bool()
+    // reflects whether a USB host has actually opened it, so this is a real
+    // USB-presence signal - used to suppress ADC skew from the charging circuit.
+    return static_cast<bool>(Serial);
 #else
+    // Production/field build: no reliable way to sense USB power. Report
+    // battery-powered so the honest battery gauge is always shown.
     return false;
 #endif
 }

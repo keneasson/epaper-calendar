@@ -403,6 +403,7 @@ ResultCode wifi_connect() {
     // Walk the compatibility ladder from most to least capable. Every failed
     // attempt logs the driver's reason code, so field logs show exactly what
     // the gateway did (AUTH_EXPIRE vs handshake timeout vs not found).
+    bool ssidNotFound = false;  // set on NO_AP_FOUND to abort the ladder early
     for (int p = 0; p < PROFILE_COUNT; p++) {
         apply_profile(p);
 
@@ -437,9 +438,26 @@ ResultCode wifi_connect() {
                      disconnect_reason_name(lastDisconnectReason));
             }
             tally_failure_reason(lastDisconnectReason);
+
+            // NO_AP_FOUND means the SSID was not seen on ANY channel (every
+            // attempt runs a full all-channel scan). The remaining ladder rungs
+            // only vary auth/assoc behaviour (11ax, SAE, TX power) - none of
+            // which can make an absent SSID appear. Walking all 12 attempts
+            // here would burn ~12x the radio-on time every wake for as long as
+            // the router/SSID is down, which is exactly what flattens the
+            // battery during an outage. Abort now; the next scheduled wake (see
+            // the disconnect backoff in power_manager) retries from the top.
+            if (lastDisconnectReason == WIFI_REASON_NO_AP_FOUND) {
+                LOG("WiFi: SSID not found on any channel - aborting ladder (no rung aids discovery)");
+                WiFi.disconnect();
+                ssidNotFound = true;
+                break;
+            }
+
             WiFi.disconnect();     // no wifioff - the next attempt needs the driver up
             delay(200);
         }
+        if (ssidNotFound) break;
     }
 
     LOG("WiFi: All profiles failed");

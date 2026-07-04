@@ -28,6 +28,16 @@
 // RTC memory persists through deep sleep
 RTC_DATA_ATTR char cachedEtag[MAX_ETAG_LENGTH] = "";
 RTC_DATA_ATTR bool firstBoot = true;
+// Consecutive failed wakes (WiFi/API down, serving stale cache). Drives the
+// deep-sleep backoff so an outage doesn't drain the battery by retrying hourly.
+// Reset to 0 on any successful connection.
+RTC_DATA_ATTR uint32_t consecutiveFailures = 0;
+// True when the last thing painted was an error / cache-fallback screen. Lets a
+// recovered connection force one repaint even on a 304 (unchanged data), so the
+// e-paper stops showing a stale "can't connect" screen after the network is
+// back. Without this, the silent-304 fast path never redraws and the display
+// keeps lying about the connection until the data changes or the 1am wake.
+RTC_DATA_ATTR bool lastScreenWasError = false;
 
 // Generate hardcoded test data for display testing
 static void generate_test_data(CalendarData& data) {
@@ -310,9 +320,14 @@ void setup() {
             // Data unchanged - check if we need to refresh display anyway
             LOG("Data unchanged (304)");
 
-            // At 1am wake, refresh display for date change even if data unchanged
-            if (power_is_date_change_wake()) {
-                LOG("Date change wake - refreshing display");
+            consecutiveFailures = 0;  // connection succeeded (304) - clear backoff
+
+            // Refresh the display when the date changed (1am) OR when the last
+            // screen was an error: the connection just recovered, so repaint to
+            // drop the stale "can't connect" screen even though the data itself
+            // is unchanged. Otherwise this is a silent no-op wake.
+            if (power_is_date_change_wake() || lastScreenWasError) {
+                LOG("Date change or recovery from error - refreshing display");
                 if (cache_load(data) != ResultCode::Success) {
                     LOG("Cache load failed, sleeping");
                     display_sleep();
@@ -346,8 +361,12 @@ void setup() {
         if (!cache_exists()) {
             LOG("No cache available - showing error");
             handle_error(failureCode);
+            lastScreenWasError = true;  // repaint once the connection recovers
             display_sleep();
-            power_enter_sleep(SLEEP_ON_ERROR);
+            // Failed wake with nothing to show - back off like any other outage
+            // so a never-provisioned device doesn't retry every 30 min forever.
+            consecutiveFailures++;
+            power_enter_sleep(power_backoff_sleep_seconds(consecutiveFailures));
             return;
         }
 
@@ -369,6 +388,11 @@ void setup() {
     LOG("Rendering calendar...");
     battery = battery_read();  // Re-read for accurate display
     display_calendar(data, battery, cacheStatus, statusNote);
+    // Remember whether this frame was a cache-fallback (error) screen so the
+    // next wake can force a repaint on recovery even if the API returns 304.
+    // (cacheStatus != None iff this was a fallback render; also valid in TEST_MODE
+    // where useCache is not defined.)
+    lastScreenWasError = (cacheStatus != CacheStatus::None);
 
     // Calculate sleep time and enter deep sleep
     display_sleep();
@@ -377,7 +401,17 @@ void setup() {
     LOG("TEST MODE: Not entering deep sleep");
     LOG("Display rendered successfully!");
 #else
-    long sleepSeconds = power_calculate_sleep_time();
+    // On a fresh render (WiFi + API OK) keep the normal cadence and clear any
+    // backoff. On a cache-fallback render (WiFi or API down) back off so a
+    // prolonged outage doesn't drain the battery retrying every hour.
+    long sleepSeconds;
+    if (useCache) {
+        consecutiveFailures++;
+        sleepSeconds = power_backoff_sleep_seconds(consecutiveFailures);
+    } else {
+        consecutiveFailures = 0;
+        sleepSeconds = power_calculate_sleep_time();
+    }
     LOGF("Sleeping for %ld seconds\n", sleepSeconds);
     power_enter_sleep(sleepSeconds);
 #endif
